@@ -1,0 +1,75 @@
+{
+  "name": "google-oauth-gemini-boilerplate",
+  "version": "1.0.0",
+  "description": "Production-ready TypeScript library for Google OAuth 2.0 authentication with Gemini API access. Includes automatic token refresh, PKCE support, and flexible token storage.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "module": "dist/index.js",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "require": "./dist/index.js",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md",
+    "API_REFERENCE.md",
+    "QUICK_START.md",
+    "SECURITY.md",
+    "TROUBLESHOOTING.md"
+  ],
+  "scripts": {
+    "build": "npm run clean && tsc",
+    "clean": "rm -rf dist",
+    "test": "vitest --run",
+    "test:watch": "vitest",
+    "test:unit": "vitest --run tests/unit",
+    "test:property": "vitest --run tests/property",
+    "test:integration": "vitest --run tests/integration",
+    "test:coverage": "vitest --run --coverage",
+    "lint": "tsc --noEmit",
+    "prepublishOnly": "npm run build && npm test",
+    "prepack": "npm run build"
+  },
+  "keywords": [
+    "google",
+    "oauth",
+    "oauth2",
+    "gemini",
+    "gemini-api",
+    "authentication",
+    "authorization",
+    "pkce",
+    "token-management",
+    "typescript",
+    "generative-ai",
+    "google-cloud",
+    "api-client"
+  ],
+  "author": "",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-org/google-oauth-gemini-boilerplate.git"
+  },
+  "bugs": {
+    "url": "https://github.com/your-org/google-oauth-gemini-boilerplate/issues"
+  },
+  "homepage": "https://github.com/your-org/google-oauth-gemini-boilerplate#readme",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "fast-check": "^3.15.0",
+    "typescript": "^5.3.3",
+    "vitest": "^1.0.4"
+  },
+  "dependencies": {}
+}

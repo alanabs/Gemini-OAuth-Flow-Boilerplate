@@ -1,0 +1,41 @@
+# Source files
+src/
+tests/
+examples/
+
+# Configuration files
+tsconfig.json
+vitest.config.ts
+.env
+.env.*
+
+# Development files
+.vscode/
+.kiro/
+*.log
+*.tgz
+
+# Git files
+.git/
+.gitignore
+
+# Documentation (keep only essential docs in package)
+CONTRIBUTING.md
+SECURITY.md
+TROUBLESHOOTING.md
+API_REFERENCE.md
+
+# Build artifacts
+node_modules/
+coverage/
+.nyc_output/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE files
+*.swp
+*.swo
+*~
+.idea/
