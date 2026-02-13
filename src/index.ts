@@ -38,3 +38,7 @@ export { GoogleOAuthClient } from './oauth-client';
 
 // Export error handler utilities
 export { ErrorHandler, GoogleErrorResponse, RateLimitError } from './error-handler';
+
+// Export additional service clients
+export { RevocationClient } from './revocation-client';
+export { UserInfoClient } from './userinfo-client';

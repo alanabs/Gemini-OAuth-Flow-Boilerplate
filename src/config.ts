@@ -23,20 +23,14 @@ export interface ConfigOptions {
 export class ConfigManager {
   /**
    * Load configuration from provided options and environment variables
-   * Environment variables are used as fallback for missing options
-   * 
-   * @param options - Configuration options
-   * @param tokenStore - Token store instance (required)
-   * @returns Validated OAuthClientConfig
-   * @throws OAuthError if configuration is invalid
    */
-  static load(options: ConfigOptions = {}, tokenStore: TokenStore): OAuthClientConfig {
-    // Load from options or environment variables
+  static load(options: ConfigOptions = {}, tokenStore?: TokenStore): OAuthClientConfig {
+    const resolvedTokenStore = options.tokenStore || tokenStore;
     const clientId = options.clientId || process.env.GOOGLE_CLIENT_ID;
     const clientSecret = options.clientSecret || process.env.GOOGLE_CLIENT_SECRET;
     const redirectUri = options.redirectUri || process.env.GOOGLE_REDIRECT_URI;
-    const scopesFromEnv = process.env.GEMINI_SCOPES?.split(',').map(s => s.trim());
-    const scopes = options.scopes || scopesFromEnv || [];
+    const scopesFromEnv = process.env.GEMINI_SCOPES?.split(',').map(s => s.trim()).filter(Boolean);
+    const scopes = Array.from(new Set([...(options.scopes || scopesFromEnv || [])]));
     const usePKCE = options.usePKCE !== undefined ? options.usePKCE : true;
 
     const config: OAuthClientConfig = {
@@ -44,24 +38,15 @@ export class ConfigManager {
       clientSecret,
       redirectUri: redirectUri || '',
       scopes,
-      tokenStore,
+      tokenStore: resolvedTokenStore as TokenStore,
       usePKCE,
     };
 
-    // Validate the configuration
     this.validate(config);
-
     return config;
   }
 
-  /**
-   * Validate OAuth client configuration
-   * 
-   * @param config - Configuration to validate
-   * @throws OAuthError if configuration is invalid
-   */
   static validate(config: OAuthClientConfig): void {
-    // Validate required fields
     if (!config.clientId || config.clientId.trim() === '') {
       throw new OAuthError(
         OAuthErrorType.INVALID_REQUEST,
@@ -90,26 +75,16 @@ export class ConfigManager {
       );
     }
 
-    // Validate HTTPS requirement for redirect URIs
     this.validateHttps(config.redirectUri);
   }
 
-  /**
-   * Validate that a URL uses HTTPS protocol
-   * Allows http://localhost for development purposes
-   * 
-   * @param url - URL to validate
-   * @throws OAuthError if URL doesn't use HTTPS (except localhost)
-   */
   static validateHttps(url: string): void {
     try {
       const parsedUrl = new URL(url);
-      
-      // Allow http for localhost/127.0.0.1 (development)
-      const isLocalhost = parsedUrl.hostname === 'localhost' || 
+      const isLocalhost = parsedUrl.hostname === 'localhost' ||
                          parsedUrl.hostname === '127.0.0.1' ||
                          parsedUrl.hostname === '[::1]';
-      
+
       if (parsedUrl.protocol !== 'https:' && !isLocalhost) {
         throw new OAuthError(
           OAuthErrorType.INVALID_REQUEST,

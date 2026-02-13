@@ -238,4 +238,19 @@ describe('GeminiClient Unit Tests', () => {
       global.fetch = originalFetch;
     }
   });
+
+  it('should reject malformed Gemini responses', async () => {
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ notCandidates: true }),
+    }) as any;
+
+    await expect(
+      geminiClient.generateContent(userId, {
+        contents: [{ parts: [{ text: 'Hello' }] }],
+      })
+    ).rejects.toMatchObject({ type: OAuthErrorType.UPSTREAM_MALFORMED_RESPONSE });
+  });
+
 });

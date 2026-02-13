@@ -207,7 +207,7 @@ describe('TokenManager Unit Tests', () => {
         await tokenManager.getValidAccessToken(userId);
         expect.fail('Should have thrown an error');
       } catch (error: any) {
-        expect(error.type).toBe(OAuthErrorType.NETWORK_ERROR);
+        expect(error.type).toBe(OAuthErrorType.RATE_LIMITED);
         expect(error.message).toContain('Rate limit exceeded');
         expect(error.message).toContain('Retry after 60 seconds');
         expect(error.retryable).toBe(true);
@@ -242,7 +242,7 @@ describe('TokenManager Unit Tests', () => {
         await tokenManager.getValidAccessToken(userId);
         expect.fail('Should have thrown an error');
       } catch (error: any) {
-        expect(error.type).toBe(OAuthErrorType.NETWORK_ERROR);
+        expect(error.type).toBe(OAuthErrorType.RATE_LIMITED);
         expect(error.message).toContain('Rate limit exceeded');
         expect(error.retryable).toBe(true);
       }
@@ -376,13 +376,44 @@ describe('TokenManager Unit Tests', () => {
   });
 
   describe('Missing tokens', () => {
-    it('should throw TOKEN_EXPIRED error when no tokens found', async () => {
+    it('should throw TOKEN_NOT_FOUND error when no tokens found', async () => {
       const userId = 'nonexistent_user';
 
       await expect(tokenManager.getValidAccessToken(userId)).rejects.toMatchObject({
-        type: OAuthErrorType.TOKEN_EXPIRED,
+        type: OAuthErrorType.TOKEN_NOT_FOUND,
         message: expect.stringContaining('No tokens found for user'),
       });
     });
   });
+
+  describe('Refresh token rotation', () => {
+    it('should persist rotated refresh token during refresh', async () => {
+      const userId = 'rotate-user';
+      await tokenStore.saveTokens(userId, {
+        accessToken: 'old-access',
+        refreshToken: 'old-refresh',
+        expiresAt: Date.now() - 1000,
+        scope: 'https://www.googleapis.com/auth/generative-language',
+        tokenType: 'Bearer',
+      });
+
+      const mockFetch = vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          access_token: 'new-access',
+          refresh_token: 'new-refresh',
+          expires_in: 3600,
+          scope: 'https://www.googleapis.com/auth/generative-language',
+          token_type: 'Bearer',
+        }),
+      });
+      global.fetch = mockFetch as any;
+
+      await tokenManager.getValidAccessToken(userId);
+      const saved = await tokenStore.getTokens(userId);
+      expect(saved?.refreshToken).toBe('new-refresh');
+    });
+  });
+
 });

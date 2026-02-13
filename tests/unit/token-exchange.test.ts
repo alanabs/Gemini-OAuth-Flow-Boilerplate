@@ -232,3 +232,58 @@ describe('TokenExchange Error Handling', () => {
     });
   });
 });
+
+describe('TokenExchange response validation', () => {
+  const toJwt = (payload: Record<string, unknown>) => {
+    const header = Buffer.from(JSON.stringify({ alg: 'none', typ: 'JWT' })).toString('base64url');
+    const body = Buffer.from(JSON.stringify(payload)).toString('base64url');
+    return `${header}.${body}.signature`;
+  };
+
+  it('should reject malformed successful token responses', async () => {
+    global.fetch = vi.fn();
+    (global.fetch as any).mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        expires_in: 3600,
+        token_type: 'Bearer',
+      }),
+    });
+
+    await expect(
+      TokenExchange.exchangeCodeForTokens('code', 'client', undefined, 'https://example.com/callback')
+    ).rejects.toMatchObject({ type: OAuthErrorType.UPSTREAM_MALFORMED_RESPONSE });
+  });
+
+  it('should reject ID token with wrong audience', async () => {
+    global.fetch = vi.fn();
+    const idToken = toJwt({
+      sub: 'user-1',
+      email: 'u@example.com',
+      email_verified: true,
+      name: 'U',
+      picture: '',
+      given_name: 'U',
+      family_name: 'One',
+      aud: 'different-client',
+      iss: 'https://accounts.google.com',
+      exp: Math.floor(Date.now() / 1000) + 3600,
+    });
+
+    (global.fetch as any).mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        access_token: 'a',
+        refresh_token: 'r',
+        expires_in: 3600,
+        scope: 'scope',
+        token_type: 'Bearer',
+        id_token: idToken,
+      }),
+    });
+
+    await expect(
+      TokenExchange.exchangeCodeForTokens('code', 'client', undefined, 'https://example.com/callback')
+    ).rejects.toThrow(/audience/i);
+  });
+});
