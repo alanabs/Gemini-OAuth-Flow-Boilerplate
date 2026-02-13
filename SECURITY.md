@@ -427,3 +427,8 @@ If you discover a security incident:
 For security concerns: [security@example.com] (replace with actual email)
 
 For general questions: [GitHub Issues](https://github.com/your-org/google-oauth-gemini-boilerplate/issues)
+
+
+## ID Token Validation
+
+This library now validates critical ID token claims (`aud`, `iss`, `exp`, `iat`) during token exchange and fails closed if claims are invalid.

@@ -73,7 +73,7 @@ export class InMemoryTokenStore implements TokenStore {
   async updateAccessToken(userId: string, accessToken: string, expiresAt: number): Promise<void> {
     const existingTokens = await this.getTokens(userId);
     if (!existingTokens) {
-      throw new Error(`No tokens found for user: ${userId}`);
+      throw new Error(`No tokens found for user: ${userId}. Re-authenticate the user first.`);
     }
 
     const updatedTokens: TokenData = {
@@ -83,6 +83,13 @@ export class InMemoryTokenStore implements TokenStore {
     };
 
     await this.saveTokens(userId, updatedTokens);
+  }
+
+  /**
+   * Update full token payload for a user
+   */
+  async updateTokens(userId: string, tokens: TokenData): Promise<void> {
+    await this.saveTokens(userId, tokens);
   }
 
   /**

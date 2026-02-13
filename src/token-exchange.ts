@@ -1,14 +1,11 @@
 /**
- * Token exchange logic for OAuth authorization code flow
- * Handles exchanging authorization codes for access and refresh tokens
+ * Token exchange handler for OAuth authorization code flow
+ * Exchanges authorization code for access and refresh tokens
  */
 
-import { OAuthError, OAuthErrorType, TokenData, UserInfo } from './types';
+import { TokenData, UserInfo, OAuthError, OAuthErrorType } from './types';
 import { ErrorHandler, GoogleErrorResponse } from './error-handler';
 
-/**
- * Response from Google's token endpoint
- */
 interface TokenResponse {
   access_token: string;
   refresh_token?: string;
@@ -18,17 +15,6 @@ interface TokenResponse {
   id_token?: string;
 }
 
-/**
- * Error response from Google's token endpoint
- */
-interface TokenErrorResponse {
-  error: string;
-  error_description?: string;
-}
-
-/**
- * Decoded ID token payload
- */
 interface IDTokenPayload {
   sub: string;
   email: string;
@@ -37,25 +23,16 @@ interface IDTokenPayload {
   picture: string;
   given_name: string;
   family_name: string;
+  aud?: string;
+  iss?: string;
+  exp?: number;
+  iat?: number;
 }
 
-/**
- * Handles token exchange operations
- */
 export class TokenExchange {
   private static readonly GOOGLE_TOKEN_ENDPOINT = 'https://oauth2.googleapis.com/token';
+  private static readonly VALID_ISSUERS = new Set(['https://accounts.google.com', 'accounts.google.com']);
 
-  /**
-   * Exchange authorization code for access and refresh tokens
-   * 
-   * @param code - Authorization code from OAuth callback
-   * @param clientId - OAuth client ID
-   * @param clientSecret - OAuth client secret (optional for public clients)
-   * @param redirectUri - Redirect URI used in authorization request
-   * @param codeVerifier - PKCE code verifier (required if PKCE was used)
-   * @returns Token data and user information
-   * @throws OAuthError if exchange fails
-   */
   static async exchangeCodeForTokens(
     code: string,
     clientId: string,
@@ -64,7 +41,6 @@ export class TokenExchange {
     codeVerifier?: string
   ): Promise<{ tokens: TokenData; userInfo: UserInfo }> {
     try {
-      // Build request body
       const body = new URLSearchParams({
         code,
         client_id: clientId,
@@ -72,17 +48,14 @@ export class TokenExchange {
         grant_type: 'authorization_code',
       });
 
-      // Add client secret if provided
       if (clientSecret) {
         body.append('client_secret', clientSecret);
       }
 
-      // Add PKCE code verifier if provided
       if (codeVerifier) {
         body.append('code_verifier', codeVerifier);
       }
 
-      // Make POST request to token endpoint
       const response = await fetch(this.GOOGLE_TOKEN_ENDPOINT, {
         method: 'POST',
         headers: {
@@ -93,17 +66,20 @@ export class TokenExchange {
 
       const data = await response.json();
 
-      // Handle error responses
       if (!response.ok) {
-        throw ErrorHandler.createFromGoogleError(
-          data as GoogleErrorResponse,
-          'Token exchange failed'
-        );
+        throw ErrorHandler.createFromGoogleError(data as GoogleErrorResponse, 'Token exchange failed');
       }
 
       const tokenResponse = data as TokenResponse;
+      if (
+        !tokenResponse.access_token ||
+        typeof tokenResponse.expires_in !== 'number' ||
+        !tokenResponse.scope ||
+        !tokenResponse.token_type
+      ) {
+        throw ErrorHandler.createMalformedResponseError('Token exchange', tokenResponse);
+      }
 
-      // Parse token response
       const tokens: TokenData = {
         accessToken: tokenResponse.access_token,
         refreshToken: tokenResponse.refresh_token || '',
@@ -112,28 +88,15 @@ export class TokenExchange {
         tokenType: tokenResponse.token_type,
       };
 
-      // Extract user info from ID token
-      const userInfo = this.extractUserInfoFromIDToken(tokenResponse.id_token);
+      const userInfo = this.extractUserInfoFromIDToken(tokenResponse.id_token, clientId);
 
       return { tokens, userInfo };
     } catch (error) {
-      // Wrap error with proper context preservation
       throw ErrorHandler.wrapError(error, 'Token exchange');
     }
   }
 
-
-
-  /**
-   * Extract user information from ID token
-   * ID token is a JWT with three parts: header.payload.signature
-   * We only need to decode the payload (base64url encoded JSON)
-   * 
-   * @param idToken - ID token from token response
-   * @returns User information
-   * @throws OAuthError if ID token is missing or invalid
-   */
-  private static extractUserInfoFromIDToken(idToken: string | undefined): UserInfo {
+  private static extractUserInfoFromIDToken(idToken: string | undefined, clientId: string): UserInfo {
     if (!idToken) {
       throw new OAuthError(
         OAuthErrorType.INVALID_REQUEST,
@@ -142,18 +105,16 @@ export class TokenExchange {
     }
 
     try {
-      // Split JWT into parts
       const parts = idToken.split('.');
       if (parts.length !== 3) {
         throw new Error('Invalid JWT format');
       }
 
-      // Decode payload (second part)
       const payload = parts[1];
       const decodedPayload = this.base64UrlDecode(payload);
       const payloadData: IDTokenPayload = JSON.parse(decodedPayload);
+      this.validateIDTokenClaims(payloadData, clientId);
 
-      // Extract user info
       return {
         sub: payloadData.sub,
         email: payloadData.email,
@@ -172,22 +133,36 @@ export class TokenExchange {
     }
   }
 
-  /**
-   * Base64url decode a string
-   * 
-   * @param str - Base64url encoded string
-   * @returns Decoded string
-   */
+  private static validateIDTokenClaims(payload: IDTokenPayload, clientId: string): void {
+    if (!payload.sub || !payload.email) {
+      throw new Error('ID token is missing required user claims');
+    }
+
+    if (payload.aud && payload.aud !== clientId) {
+      throw new Error('ID token audience does not match client ID');
+    }
+
+    if (payload.iss && !this.VALID_ISSUERS.has(payload.iss)) {
+      throw new Error('ID token issuer is invalid');
+    }
+
+    const nowSeconds = Math.floor(Date.now() / 1000);
+    if (payload.exp && payload.exp <= nowSeconds) {
+      throw new Error('ID token has expired');
+    }
+
+    if (payload.iat && payload.iat > nowSeconds + 60) {
+      throw new Error('ID token issued-at claim is in the future');
+    }
+  }
+
   private static base64UrlDecode(str: string): string {
-    // Convert base64url to base64
     let base64 = str.replace(/-/g, '+').replace(/_/g, '/');
-    
-    // Add padding if needed
+
     while (base64.length % 4 !== 0) {
       base64 += '=';
     }
 
-    // Decode base64
     return Buffer.from(base64, 'base64').toString('utf-8');
   }
 }

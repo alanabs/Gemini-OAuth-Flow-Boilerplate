@@ -815,3 +815,10 @@ process.env.DEBUG = 'oauth:*';
 - [examples/](./examples/) - Usage examples
 - [Google OAuth Documentation](https://developers.google.com/identity/protocols/oauth2)
 - [Gemini API Documentation](https://ai.google.dev/docs)
+
+
+## Error Types and Next Actions
+
+- `TOKEN_NOT_FOUND`: User has no stored credentials. Re-run the OAuth authorization flow.
+- `RATE_LIMITED`: Back off and retry after `retryAfter` when provided.
+- `UPSTREAM_MALFORMED_RESPONSE`: Upstream API returned unexpected JSON shape. Log `originalError` and retry cautiously.

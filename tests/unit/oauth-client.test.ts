@@ -185,12 +185,28 @@ describe('GoogleOAuthClient', () => {
 
       await tokenStore.saveTokens(userId, tokens);
 
+      const mockFetch = vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          sub: userId,
+          email: 'test@example.com',
+          email_verified: true,
+          name: 'Test User',
+          picture: '',
+          given_name: 'Test',
+          family_name: 'User',
+        }),
+      });
+      global.fetch = mockFetch;
+
       // Act
       const userInfo = await client.getUserInfo(userId);
 
       // Assert
       expect(userInfo).not.toBeNull();
       expect(userInfo?.sub).toBe(userId);
+      expect(userInfo?.email).toBe('test@example.com');
     });
   });
 });

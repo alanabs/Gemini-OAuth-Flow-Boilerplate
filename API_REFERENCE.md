@@ -958,3 +958,14 @@ app.listen(3000, () => {
 - [examples/](./examples/) - Usage examples
 - [Google OAuth 2.0 Documentation](https://developers.google.com/identity/protocols/oauth2)
 - [Gemini API Documentation](https://ai.google.dev/docs)
+
+
+## Constructor options
+
+`GoogleOAuthClient` accepts either:
+- `new GoogleOAuthClient({ ...options, tokenStore })`
+- `new GoogleOAuthClient(options, tokenStore)` (backward compatible)
+
+## `getUserInfo(userId)` behavior
+
+`getUserInfo` now fetches profile data from Google's OpenID userinfo endpoint using a valid access token. It returns `null` only when no tokens are stored for that user.

@@ -177,6 +177,10 @@ export class RedisTokenStore implements TokenStore {
     await this.saveTokens(userId, updatedTokens);
   }
 
+  async updateTokens(userId: string, tokens: TokenData): Promise<void> {
+    await this.saveTokens(userId, tokens);
+  }
+
   /**
    * Close the Redis connection
    * Call this when shutting down your application

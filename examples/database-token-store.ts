@@ -191,6 +191,10 @@ export class DatabaseTokenStore implements TokenStore {
     }
   }
 
+  async updateTokens(userId: string, tokens: TokenData): Promise<void> {
+    await this.saveTokens(userId, tokens);
+  }
+
   /**
    * Close the database connection pool
    * Call this when shutting down your application

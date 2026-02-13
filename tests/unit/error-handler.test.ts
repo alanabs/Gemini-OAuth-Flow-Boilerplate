@@ -47,7 +47,7 @@ describe('ErrorHandler Unit Tests', () => {
       const error = ErrorHandler.createRateLimitError(60, { error: 'rate_limit' });
       
       expect(error).toBeInstanceOf(Error);
-      expect(error.type).toBe(OAuthErrorType.NETWORK_ERROR);
+      expect(error.type).toBe(OAuthErrorType.RATE_LIMITED);
       expect(error.retryable).toBe(true);
       expect(error.message).toContain('60 seconds');
       expect((error as RateLimitError).retryAfter).toBe(60);
@@ -58,7 +58,7 @@ describe('ErrorHandler Unit Tests', () => {
       const error = ErrorHandler.createRateLimitError(undefined);
       
       expect(error).toBeInstanceOf(Error);
-      expect(error.type).toBe(OAuthErrorType.NETWORK_ERROR);
+      expect(error.type).toBe(OAuthErrorType.RATE_LIMITED);
       expect(error.retryable).toBe(true);
       expect(error.message).toContain('Rate limit exceeded');
       expect(error.message).toContain('try again later');

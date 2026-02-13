@@ -7,38 +7,22 @@ import { TokenManager } from './token-manager';
 import { GeminiRequest, GeminiResponse, OAuthError, OAuthErrorType } from './types';
 import { ErrorHandler } from './error-handler';
 
-/**
- * Client for making authenticated requests to the Gemini API
- */
 export class GeminiClient {
   private static readonly GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta';
   private static readonly DEFAULT_MODEL = 'gemini-1.5-pro';
 
   constructor(private tokenManager: TokenManager) {}
 
-  /**
-   * Generate content using the Gemini API
-   * @param userId - User identifier for token retrieval
-   * @param request - Gemini API request
-   * @returns Gemini API response
-   * @throws OAuthError for authentication or API errors
-   */
-  async generateContent(
-    userId: string,
-    request: GeminiRequest
-  ): Promise<GeminiResponse> {
+  async generateContent(userId: string, request: GeminiRequest): Promise<GeminiResponse> {
     const model = request.model || GeminiClient.DEFAULT_MODEL;
     const url = `${GeminiClient.GEMINI_API_BASE}/models/${model}:generateContent`;
 
-    // Get valid access token (will refresh if needed)
     let accessToken = await this.tokenManager.getValidAccessToken(userId);
 
     try {
       return await this.makeRequest(url, accessToken, request);
     } catch (error) {
-      // Handle 401 errors with token refresh and retry
       if (error instanceof OAuthError && error.type === OAuthErrorType.UNAUTHORIZED_CLIENT) {
-        // Try to refresh token and retry once
         accessToken = await this.tokenManager.getValidAccessToken(userId);
         return await this.makeRequest(url, accessToken, request);
       }
@@ -46,15 +30,16 @@ export class GeminiClient {
     }
   }
 
-  /**
-   * Make the actual HTTP request to Gemini API
-   * @private
-   */
-  private async makeRequest(
-    url: string,
-    accessToken: string,
-    request: GeminiRequest
-  ): Promise<GeminiResponse> {
+  private validateGeminiResponse(data: unknown): GeminiResponse {
+    const payload = data as GeminiResponse;
+    if (!payload || !Array.isArray(payload.candidates)) {
+      throw ErrorHandler.createMalformedResponseError('Gemini API request', data);
+    }
+
+    return payload;
+  }
+
+  private async makeRequest(url: string, accessToken: string, request: GeminiRequest): Promise<GeminiResponse> {
     try {
       const response = await fetch(url, {
         method: 'POST',
@@ -71,38 +56,34 @@ export class GeminiClient {
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({})) as any;
 
-        // Handle 401 Unauthorized - token may be invalid
         if (response.status === 401) {
           throw new OAuthError(
             OAuthErrorType.UNAUTHORIZED_CLIENT,
-            'Access token is invalid or expired',
+            'Access token is invalid or expired. Re-authenticate if this persists.',
             errorData
           );
         }
 
-        // Handle 429 Quota Exceeded - do not retry
         if (response.status === 429) {
           throw new OAuthError(
             OAuthErrorType.QUOTA_EXCEEDED,
-            'Gemini API quota exceeded for this user',
+            'Gemini API quota exceeded for this user. Retry later or increase quota.',
             errorData,
-            false // Not retryable
+            false
           );
         }
 
-        // Handle other errors
         throw new OAuthError(
           OAuthErrorType.NETWORK_ERROR,
           `Gemini API request failed: ${errorData.error?.message || 'Unknown error'}`,
           errorData,
-          response.status >= 500 // Server errors are retryable
+          response.status >= 500
         );
       }
 
-      const data = await response.json() as GeminiResponse;
-      return data;
+      const data = await response.json();
+      return this.validateGeminiResponse(data);
     } catch (error) {
-      // Wrap error with proper context preservation
       throw ErrorHandler.wrapError(error, 'Gemini API request');
     }
   }

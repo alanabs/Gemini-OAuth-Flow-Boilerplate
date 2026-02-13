@@ -553,7 +553,7 @@ describe('OAuth Flow Integration Tests', () => {
           contents: [{ parts: [{ text: 'Test' }] }],
         });
       } catch (error: any) {
-        expect(error.type).toBe(OAuthErrorType.TOKEN_EXPIRED);
+        expect(error.type).toBe(OAuthErrorType.TOKEN_NOT_FOUND);
         expect(error.message).toContain('No tokens found');
       }
     });

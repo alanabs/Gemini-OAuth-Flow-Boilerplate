@@ -38,6 +38,11 @@ export interface TokenStore {
    * Update only access token (after refresh)
    */
   updateAccessToken(userId: string, accessToken: string, expiresAt: number): Promise<void>;
+
+  /**
+   * Persist complete token payload after refresh/token rotation
+   */
+  updateTokens(userId: string, tokens: TokenData): Promise<void>;
 }
 
 /**
@@ -107,7 +112,10 @@ export enum OAuthErrorType {
   INVALID_GRANT = 'invalid_grant',
   NETWORK_ERROR = 'network_error',
   TOKEN_EXPIRED = 'token_expired',
+  TOKEN_NOT_FOUND = 'token_not_found',
   QUOTA_EXCEEDED = 'quota_exceeded',
+  RATE_LIMITED = 'rate_limited',
+  UPSTREAM_MALFORMED_RESPONSE = 'upstream_malformed_response',
 }
 
 /**
@@ -115,13 +123,13 @@ export enum OAuthErrorType {
  */
 export class OAuthError extends Error {
   public type: OAuthErrorType;
-  public originalError?: any;
+  public originalError?: unknown;
   public retryable: boolean;
 
   constructor(
     type: OAuthErrorType,
     message: string,
-    originalError?: any,
+    originalError?: unknown,
     retryable: boolean = false
   ) {
     super(message);
@@ -130,7 +138,6 @@ export class OAuthError extends Error {
     this.originalError = originalError;
     this.retryable = retryable;
 
-    // Maintains proper stack trace for where our error was thrown (only available on V8)
     if (Error.captureStackTrace) {
       Error.captureStackTrace(this, OAuthError);
     }

@@ -81,8 +81,13 @@ describe('InMemoryTokenStore - Property Tests', () => {
             await store.saveTokens(userId, tokenData);
           }
 
-          // Verify each user gets their own tokens back
+          // Verify each user gets their latest saved tokens back
+          const expectedByUser = new Map<string, TokenData>();
           for (const { userId, tokenData } of userTokenPairs) {
+            expectedByUser.set(userId, tokenData);
+          }
+
+          for (const [userId, tokenData] of expectedByUser.entries()) {
             const retrieved = await store.getTokens(userId);
             expect(retrieved).not.toBeNull();
             expect(retrieved?.accessToken).toBe(tokenData.accessToken);
